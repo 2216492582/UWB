@@ -1,0 +1,11 @@
+<launch>
+    <node pkg="nlink_distance" type="linktrack_example" name="linktrack_example" output="screen">
+    </node>
+
+
+    
+</launch>
+
+
+<!-- roslaunch nlink_parser linktrack.launch -->
+<!-- roslaunch nlink_example linktrack.launch -->
