@@ -24,7 +24,7 @@ std::vector<double> get_time(6,0);
 double distance,distance_kf_before;
 
 int UWB_id = 1; //表示当前为哪个uwb模块
-
+uint rec_data[8][20];
 
 KalmanFilter kf(0.1, 0.1, 0.1, 0.0);  //初始化一个卡尔曼滤波器
 
@@ -33,6 +33,7 @@ KalmanFilter kf(0.1, 0.1, 0.1, 0.0);  //初始化一个卡尔曼滤波器
 
 void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
 {
+  // std::cout<< msg << std::endl;
   for(auto& node:msg.nodes)
   {
     // std::cout<< node << std::endl;
@@ -44,6 +45,26 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
     // smooth_val = kf.filter(val);
   }
 }
+
+void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
+{
+  // std::cout<< msg << std::endl;
+  for(auto& node:msg.nodes)
+  {
+    // node.id
+    for(int i = 0; i < node.data.size(); i++)
+    {
+      rec_data[node.id][i] = node.data[i];
+      // std::cout<< rec_data[0][i] << std::endl;
+    }
+
+    // get_time[node.id]=ros::Time::now().toSec();
+
+  }
+}
+
+
+
 
 int main(int argc, char **argv)
 {
@@ -64,11 +85,11 @@ int main(int argc, char **argv)
   // }
 
 
-  ros::Subscriber sub = nh.subscribe("/nlink_linktrack_nodeframe2", 1000, nodeframe2Callback);
-
+  ros::Subscriber sub = nh.subscribe("/nlink_linktrack_nodeframe2", 1000, nodeframe2Callback);   //订阅UWB发送的距离话题
+  ros::Subscriber data_sub1 = nh.subscribe("/nlink_linktrack_nodeframe0", 1000, nodeframe0Callback);   //订阅UWB发送的数据话题
 // 创建一个发布者，发布名为"/pose_stamped_topic"的话题，消息类型为geometry_msgs::PoseStamped
   ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);
-
+  // ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
 
 
