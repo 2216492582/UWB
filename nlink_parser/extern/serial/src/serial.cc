@@ -273,6 +273,10 @@ Serial::write (const uint8_t *data, size_t size)
   return this->write_(data, size);
 }
 
+
+
+
+
 size_t
 Serial::write_ (const uint8_t *data, size_t length)
 {

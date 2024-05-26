@@ -18,18 +18,33 @@
 // #include <geometry_msgs/PoseStamped.h>
 #include <fstream> // 包含文件操作的头文件
 #include <iostream> // 包含文件操作的头文件
-std::vector<Eigen::Vector3d> target_pos(6);
+#include <vector>
+
+#define UWB_id  1 //表示当前为哪个uwb模块
+#define DATA_length  32 //表示数传模式接收数据数组长度
+#define UWB_capacity 8 //表示uwb模块数量
+
 nlink_distance::DistanceArray distance_msg;  //存储distance的msg
 
 std::vector<double> get_time(6,0);
-double distance,distance_kf_before;
+double distance,distance_kf_before;  //卡尔曼滤波前后的距离值
 
-int UWB_id = 1; //表示当前为哪个uwb模块
-uint rec_data[8][20]; //接收到的数传数据
+
+// uint rec_data[8][32]; //接收到的数传数据，后续使用二维vector实现
+std::vector<std::vector<uint8_t> > rec_data(8,std::vector<uint8_t>(DATA_length,0));
+std::vector<std::vector<float> > distance_DATA(8,std::vector<float>(8,0));
 
 KalmanFilter kf(0.1, 0.1, 0.1, 0.0);  //初始化一个卡尔曼滤波器
 
 
+//将字节数据转换回float数组
+// Function to convert byte array back to float array
+std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData) {
+    size_t floatCount = byteData.size() / sizeof(float);
+    std::vector<float> floatArray(floatCount);
+    std::memcpy(floatArray.data(), byteData.data(), byteData.size());
+    return floatArray;
+}
 
 //nodeframe2的回调函数，用于接受uwb的相对测距数据
 void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
@@ -57,9 +72,10 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
       //接受到的数据
       rec_data[node.id][i] = node.data[i];
     }
-
+    // convertBytesToFloatArray(rec_data[node.id])
+    distance_DATA[node.id] = convertBytesToFloatArray(rec_data[node.id]);  //将数据转换为float数组
+    std::cout << distance_DATA[0][0] << std::endl;
     // get_time[node.id]=ros::Time::now().toSec();
-
   }
 }
 
@@ -89,10 +105,11 @@ int main(int argc, char **argv)
   //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
   ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
-
+  std::vector<uint8_t> receivedByteData = {0x00, 0x00, 0x80, 0x3F, 0xCD, 0xCC, 0x0C, 0x40, 0x33, 0x33, 0x53, 0x40, 0x66, 0x66, 0x8A, 0x40, 0x9A, 0x99, 0xAE, 0x40, 0xCD, 0xCC, 0xD0, 0x40, 0x00, 0x00, 0xF0, 0x40, 0x33, 0x33, 0x10, 0x41};
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为1Hz
   while (ros::ok()) {
+    std::vector<float> floatArray = convertBytesToFloatArray(receivedByteData);
 
     // if(get_time[0]!=0 && get_time[1]!=0 && abs(get_time[0]-get_time[1])<2){
     //     // outFile0 << target_pos[0][0] <<", "<<target_pos[0][1] <<", " <<target_pos[0][2] << std::endl;
