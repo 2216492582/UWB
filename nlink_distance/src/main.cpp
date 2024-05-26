@@ -20,42 +20,42 @@
 #include <iostream> // 包含文件操作的头文件
 std::vector<Eigen::Vector3d> target_pos(6);
 nlink_distance::DistanceArray distance_msg;  //存储distance的msg
+
 std::vector<double> get_time(6,0);
 double distance,distance_kf_before;
 
 int UWB_id = 1; //表示当前为哪个uwb模块
-uint rec_data[8][20];
+uint rec_data[8][20]; //接收到的数传数据
 
 KalmanFilter kf(0.1, 0.1, 0.1, 0.0);  //初始化一个卡尔曼滤波器
 
 
 
-
+//nodeframe2的回调函数，用于接受uwb的相对测距数据
 void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
 {
-  // std::cout<< msg << std::endl;
   for(auto& node:msg.nodes)
   {
-    // std::cout<< node << std::endl;
+    std::cout<< node << std::endl;
     // get_time[node.id]=ros::Time::now().toSec();
     distance_kf_before = node.dis;
-    distance = kf.filter(distance_kf_before);
-    distance_msg.distances[node.id] =  distance;  //
-    distance_msg.distances[UWB_id] = 0;
-    // smooth_val = kf.filter(val);
+    distance = kf.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+    distance_msg.distances[node.id] =  distance;  
+    distance_msg.distances[UWB_id] = 0;       //uwb模块自身与自身的距离值设置为0
   }
 }
 
+
+//nodeframe0的回调函数，用于接受uwb的数传数据
 void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
 {
-  // std::cout<< msg << std::endl;
   for(auto& node:msg.nodes)
   {
-    // node.id
+    // node.id代表不同uwb广播发出的数据
     for(int i = 0; i < node.data.size(); i++)
     {
+      //接受到的数据
       rec_data[node.id][i] = node.data[i];
-      // std::cout<< rec_data[0][i] << std::endl;
     }
 
     // get_time[node.id]=ros::Time::now().toSec();
@@ -70,9 +70,8 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "linktrack_example");
   ros::NodeHandle nh;
-  // target_pos.resize(4);//初始化4个
 
-
+  //测试使用
   // std::ofstream outFile0("/home/tgm/uwb0.txt");
   // if (!outFile0.is_open()) {
   //   ROS_ERROR("open file failed");
@@ -87,46 +86,20 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub = nh.subscribe("/nlink_linktrack_nodeframe2", 1000, nodeframe2Callback);   //订阅UWB发送的距离话题
   ros::Subscriber data_sub1 = nh.subscribe("/nlink_linktrack_nodeframe0", 1000, nodeframe0Callback);   //订阅UWB发送的数据话题
-// 创建一个发布者，发布名为"/pose_stamped_topic"的话题，消息类型为geometry_msgs::PoseStamped
-  ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);
-  // ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);
+  //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
+  ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
-
-
-  // std::ofstream outFile2("/home/lqh/mapping/uwb2.txt");
-  // if (!outFile2.is_open()) {
-  //   ROS_ERROR("open file failed");
-  //   return -1;
-  // }
-  // std::ofstream outFile3("/home/lqh/mapping/uwb3.txt");
-  // if (!outFile3.is_open()) {
-  //   ROS_ERROR("open file failed");
-  //   return -1;
-  // }
-  // std::ofstream outFile4("/home/lqh/mapping/diff0.txt");
-  // if (!outFile4.is_open()) {
-  //   ROS_ERROR("open file failed");
-  //   return -1;
-  // }
-  // std::ofstream outFile5("/home/lqh/mapping/diff1.txt");
-  // if (!outFile5.is_open()) {
-  //   ROS_ERROR("open file failed");
-  //   return -1;
-  // }
 
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为1Hz
   while (ros::ok()) {
-    // if()
+
     // if(get_time[0]!=0 && get_time[1]!=0 && abs(get_time[0]-get_time[1])<2){
-        
     //     // outFile0 << target_pos[0][0] <<", "<<target_pos[0][1] <<", " <<target_pos[0][2] << std::endl;
     //     // outFile1 << target_pos[1][0] <<", "<<target_pos[1][1] <<", " <<target_pos[1][2] << std::endl;
     //     // auto tmpa=target_pos[1]-target_pos[0];
     //     // outFile4 << tmpa[0] <<", "<<tmpa[1] <<", " <<tmpa[2] << std::endl;        
-        
     //     // 填充消息对象的内容
-
     //     poseStampedMsg.header.stamp = ros::Time::now();
     //     poseStampedMsg.header.frame_id = "0"; // 设置坐标系
     //     auto tmp=(target_pos[0]+target_pos[1])/2;
