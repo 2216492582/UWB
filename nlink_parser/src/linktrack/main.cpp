@@ -60,9 +60,6 @@ void DistanceMsgCallback(const nlink_distance::DistanceArray &msg)
 }
 
 
-
-
-
 int main(int argc, char **argv) {
   ros::init(argc, argv, "linktrack_parser");
   ros::NodeHandle nh;

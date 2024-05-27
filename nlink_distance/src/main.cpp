@@ -57,7 +57,13 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
     distance = kf.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
     distance_msg.distances[node.id] =  distance;  
     distance_msg.distances[UWB_id] = 0;       //uwb模块自身与自身的距离值设置为0
+    
   }
+  for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
+  {
+        distance_DATA[UWB_id][i] = distance_msg.distances[i];
+  }
+  
 }
 
 
@@ -75,11 +81,10 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
     // convertBytesToFloatArray(rec_data[node.id])
     distance_DATA[node.id] = convertBytesToFloatArray(rec_data[node.id]);  //将数据转换为float数组
     std::cout << distance_DATA[0][0] << std::endl;
+    
     // get_time[node.id]=ros::Time::now().toSec();
   }
 }
-
-
 
 
 int main(int argc, char **argv)
@@ -105,12 +110,9 @@ int main(int argc, char **argv)
   //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
   ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
-  std::vector<uint8_t> receivedByteData = {0x00, 0x00, 0x80, 0x3F, 0xCD, 0xCC, 0x0C, 0x40, 0x33, 0x33, 0x53, 0x40, 0x66, 0x66, 0x8A, 0x40, 0x9A, 0x99, 0xAE, 0x40, 0xCD, 0xCC, 0xD0, 0x40, 0x00, 0x00, 0xF0, 0x40, 0x33, 0x33, 0x10, 0x41};
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为1Hz
   while (ros::ok()) {
-    std::vector<float> floatArray = convertBytesToFloatArray(receivedByteData);
-
     // if(get_time[0]!=0 && get_time[1]!=0 && abs(get_time[0]-get_time[1])<2){
     //     // outFile0 << target_pos[0][0] <<", "<<target_pos[0][1] <<", " <<target_pos[0][2] << std::endl;
     //     // outFile1 << target_pos[1][0] <<", "<<target_pos[1][1] <<", " <<target_pos[1][2] << std::endl;
