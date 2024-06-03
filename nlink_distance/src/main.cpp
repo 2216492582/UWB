@@ -108,7 +108,7 @@ int main(int argc, char **argv)
   ros::Subscriber sub = nh.subscribe("/nlink_linktrack_nodeframe2", 1000, nodeframe2Callback);   //订阅UWB发送的距离话题
   ros::Subscriber data_sub1 = nh.subscribe("/nlink_linktrack_nodeframe0", 1000, nodeframe0Callback);   //订阅UWB发送的数据话题
   //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
-  ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
+  ros::Publisher oneself_distance_pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为1Hz
@@ -188,7 +188,8 @@ int main(int argc, char **argv)
     //     poseStampedMsg.pose.orientation.w = target_pos[5].y();
         // outFile0 << distance_kf_before << std::endl;
         // outFile1 << distance << std::endl;
-        pub.publish(distance_msg); // 发布消息
+        oneself_distance_pub.publish(distance_msg); // 发布消息
+        
     //     get_time[4]=0;
     //     get_time[5]=0;
         
