@@ -15,12 +15,14 @@
 #include <Eigen/Dense>
 #include <nlink_distance/DistanceArray.h>
 #include <Kalman_Filter.hpp>
+#include <tool.hpp>
 // #include <geometry_msgs/PoseStamped.h>
 #include <fstream> // 包含文件操作的头文件
 #include <iostream> // 包含文件操作的头文件
 #include <vector>
+#include <sstream>
 
-#define UWB_id  1 //表示当前为哪个uwb模块
+#define UWB_id  0 //表示当前为哪个uwb模块
 #define DATA_length  32 //表示数传模式接收数据数组长度
 #define UWB_capacity 8 //表示uwb模块数量
 
@@ -34,8 +36,7 @@ double distance,distance_kf_before;  //卡尔曼滤波前后的距离值
 std::vector<std::vector<uint8_t> > rec_data(8,std::vector<uint8_t>(DATA_length,0));
 std::vector<std::vector<float> > distance_DATA(8,std::vector<float>(8,0));
 
-KalmanFilter kf(0.1, 0.1, 0.1, 0.0);  //初始化一个卡尔曼滤波器
-
+KalmanFilter kf(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
 
 //将字节数据转换回float数组
 // Function to convert byte array back to float array
@@ -51,7 +52,7 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
 {
   for(auto& node:msg.nodes)
   {
-    std::cout<< node << std::endl;
+    // std::cout<< node << std::endl;
     // get_time[node.id]=ros::Time::now().toSec();
     distance_kf_before = node.dis;
     distance = kf.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
@@ -66,7 +67,6 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
   
 }
 
-
 //nodeframe0的回调函数，用于接受uwb的数传数据
 void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
 {
@@ -80,7 +80,7 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
     }
     // convertBytesToFloatArray(rec_data[node.id])
     distance_DATA[node.id] = convertBytesToFloatArray(rec_data[node.id]);  //将数据转换为float数组
-    std::cout << distance_DATA[0][0] << std::endl;
+    // std::cout << distance_DATA[0][0] << std::endl;
     
     // get_time[node.id]=ros::Time::now().toSec();
   }
@@ -91,6 +91,20 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "linktrack_example");
   ros::NodeHandle nh;
+//   float Q,R,P,X;
+// // 卡尔曼滤波器测试使用代码
+//   std::string filename = "/home/tgm/UWB/uwb_ws/src/nlink_distance/src/kf_config.txt"; // 替换为你的文件名
+//   std::string key_Q = "Q=";
+//   std::string key_R = "R=";
+//   std::string key_P = "P=";
+//   std::string key_X = "X=";
+
+//   try {
+//       int q_value = getQValueFromFile(filename, key_Q);
+//       std::cout << "The value of " << key_Q << " is: " << q_value << std::endl;
+//   } catch (const std::exception& e) {
+//       std::cerr << e.what() << std::endl;
+//   }
 
   //测试使用
   // std::ofstream outFile0("/home/tgm/uwb0.txt");
@@ -108,7 +122,7 @@ int main(int argc, char **argv)
   ros::Subscriber sub = nh.subscribe("/nlink_linktrack_nodeframe2", 1000, nodeframe2Callback);   //订阅UWB发送的距离话题
   ros::Subscriber data_sub1 = nh.subscribe("/nlink_linktrack_nodeframe0", 1000, nodeframe0Callback);   //订阅UWB发送的数据话题
   //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
-  ros::Publisher oneself_distance_pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
+  ros::Publisher pub = nh.advertise<nlink_distance::DistanceArray>("/distance_topic", 10);  
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0}; 
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为1Hz
@@ -188,7 +202,7 @@ int main(int argc, char **argv)
     //     poseStampedMsg.pose.orientation.w = target_pos[5].y();
         // outFile0 << distance_kf_before << std::endl;
         // outFile1 << distance << std::endl;
-        oneself_distance_pub.publish(distance_msg); // 发布消息
+        pub.publish(distance_msg); // 发布消息
         
     //     get_time[4]=0;
     //     get_time[5]=0;
