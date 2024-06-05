@@ -43,7 +43,8 @@ include_directories(${EIGEN3_INCLUDE_DIRS})
 
 add_message_files(
   FILES
-  DistanceArray.msg
+  DistanceArray_oneself.msg
+  DistanceArray_all.msg
 )
 
 ## Generate added messages and services with any dependencies listed here

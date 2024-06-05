@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <vector>
-#include <nlink_distance/DistanceArray.h>
+#include <nlink_distance/DistanceArray_oneself.h>
 
 // nlink_distance::DistanceArray distance_msg;  //存储distance的msg
 float distance_array[8];
@@ -48,7 +48,7 @@ std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData
 
 std::vector<uint8_t> byteData;//用于存储float转化为byte的数据
 //DistanceMsg的回调函数，用于接受距离数据，并将其转化为字节数据存储，等待后续发送
-void DistanceMsgCallback(const nlink_distance::DistanceArray &msg)
+void DistanceMsgCallback(const nlink_distance::DistanceArray_oneself &msg)
 {
   // distance_msg = msg;
   // std::cout << msg << std::endl;

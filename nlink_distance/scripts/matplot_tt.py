@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from nlink_distance.msg import DistanceArray  # Import the custom message type
+from nlink_distance.msg import DistanceArray_oneself  # Import the custom message type
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -30,6 +30,7 @@ class DistancePlotter:
 
     def update_plot(self):
         for i in range(8):
+            # print(1)
             if self.index == 0:
                 # When the index is at the start, use the whole buffer
                 self.lines[i].set_ydata(self.distance_data[i])
@@ -51,7 +52,7 @@ class DistancePlotter:
 if __name__ == '__main__':
     rospy.init_node('distance_plotter', anonymous=True)
     plotter = DistancePlotter()
-    rospy.Subscriber("/distance_topic", DistanceArray, plotter.callback)
+    rospy.Subscriber("/distance_topic", DistanceArray_oneself, plotter.callback)
     try:
         plotter.run()
     except rospy.ROSInterruptException:

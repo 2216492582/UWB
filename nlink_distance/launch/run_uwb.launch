@@ -2,6 +2,6 @@
     <node pkg="nlink_distance" type="linktrack_example" name="linktrack_example" output="screen">
     </node>
 
-    <!-- <include file="$(find nlink_parser)/launch/linktrack.launch">
-	</include> -->
+    <include file="$(find nlink_parser)/launch/linktrack.launch">
+	</include>
 </launch>
