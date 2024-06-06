@@ -52,6 +52,40 @@ std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData
     return floatArray;
 }
 
+void Vector2Msg(int UWB_id,int index,float data) {
+  switch (UWB_id)
+  {
+  case 0:
+    distance_all_msg.uwb0[index] = data;
+    break;
+  case 1:
+    distance_all_msg.uwb1[index] = data;
+    break;
+  case 2:
+    distance_all_msg.uwb2[index] = data;
+    break;
+  case 3:
+    distance_all_msg.uwb3[index] = data;
+    break;
+  case 4:
+    distance_all_msg.uwb4[index] = data;
+    break;
+  case 5:
+    distance_all_msg.uwb5[index] = data;
+    break;
+  case 6:
+    distance_all_msg.uwb6[index] = data;
+    break;
+  case 7:
+    distance_all_msg.uwb7[index] = data;
+    break;
+  default:
+    break;
+  }
+  // std::memcpy(arr, vec.data(), vec.size() * sizeof(float));
+}
+
+
 //nodeframe2的回调函数，用于接受uwb的相对测距数据
 void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
 {
@@ -70,8 +104,10 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
   for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
   {
     distance_DATA[UWB_id][i] = distance_msg.distances[i];
+    Vector2Msg(UWB_id,i,distance_msg.distances[i]);
   }
 }
+
 
 //nodeframe0的回调函数，用于接受uwb的数传数据
 void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
@@ -86,16 +122,16 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
     }
     // convertBytesToFloatArray(rec_data[node.id])
     distance_DATA[node.id] = convertBytesToFloatArray(rec_data[node.id]);  //将数据转换为float数组
-    
+    for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
+    {
+      Vector2Msg(node.id,i,distance_DATA[node.id][i]);
+    }
     // std::cout << distance_DATA[0][0] << std::endl;
 
     // get_time[node.id]=ros::Time::now().toSec();
   }
 }
 
-void vectorToFloatArray(const std::vector<float>& vec, float* arr) {
-    std::memcpy(arr, vec.data(), vec.size() * sizeof(float));
-}
 
 
 int main(int argc, char **argv)

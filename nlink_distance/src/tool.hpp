@@ -36,3 +36,6 @@ int getQValueFromFile(const std::string& filename, const std::string& key) {
 
     return value;
 }
+
+
+
