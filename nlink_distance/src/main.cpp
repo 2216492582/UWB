@@ -23,13 +23,16 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <nav_msgs/Odometry.h>
 
 // #define UWB_id  0 //表示当前为哪个uwb模块（测速使用，后续从msg中判断属于哪个模块）
 #define DATA_length  32 //表示数传模式接收数据数组长度
 #define UWB_capacity 8 //表示uwb模块数量
 
 nlink_distance::DistanceArray_oneself distance_msg;  //存储distance的msg
-nlink_distance::DistanceArray_all distance_all_msg;  //存储distance的msg
+nlink_distance::DistanceArray_all distance_all_msg;  //存储distance_all的msg
+
+nav_msgs::Odometry Broadcast_msg;  //存储distance_all的msg
 
 
 std::vector<double> get_time(6,0);
@@ -37,9 +40,13 @@ double distance,distance_kf_before;  //卡尔曼滤波前后的距离值
 
 int UWB_id = 0;//表示当前为哪个uwb模块
 
-// uint rec_data[8][32]; //接收到的数传数据，后续使用二维vector实现
-std::vector<std::vector<uint8_t> > rec_data(8,std::vector<uint8_t>(DATA_length,0));
+// uint rec_data[8][32]; //接收到的uwb数传数据，后续使用二维vector实现
+std::vector<std::vector<uint8_t> > rec_data_uwb(8,std::vector<uint8_t>(DATA_length,0));
+
+std::vector<uint8_t > rec_data_broadcast(44);  //接收到的广播数据
+
 std::vector<std::vector<float> > distance_DATA(8,std::vector<float>(8,0));
+std::vector<float> Broadcast_DATA(11);
 
 KalmanFilter kf(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
 
@@ -52,6 +59,7 @@ std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData
     return floatArray;
 }
 
+//将接收到的uwb数据使转为msg
 void Vector2Msg(int UWB_id,int index,float data) {
   switch (UWB_id)
   {
@@ -85,21 +93,32 @@ void Vector2Msg(int UWB_id,int index,float data) {
   // std::memcpy(arr, vec.data(), vec.size() * sizeof(float));
 }
 
+//将接收到的广播数据使转为msg
+void vector2BroadcastMsg(void)
+{
+  Broadcast_msg.pose.pose.position.x = Broadcast_DATA[0];
+  Broadcast_msg.pose.pose.position.y = Broadcast_DATA[1];
+  Broadcast_msg.pose.pose.position.z =  Broadcast_DATA[2];
+  Broadcast_msg.pose.pose.orientation.x = Broadcast_DATA[3];
+  Broadcast_msg.pose.pose.orientation.y = Broadcast_DATA[4];
+  Broadcast_msg.pose.pose.orientation.z = Broadcast_DATA[5];
+  Broadcast_msg.pose.pose.orientation.w = Broadcast_DATA[6];
+  Broadcast_msg.pose.covariance[0] = Broadcast_DATA[7];
+  Broadcast_msg.pose.covariance[1] = Broadcast_DATA[8];
+  Broadcast_msg.twist.covariance[0] = Broadcast_DATA[9];
+  Broadcast_msg.twist.covariance[1] = Broadcast_DATA[10];
+}
 
 //nodeframe2的回调函数，用于接受uwb的相对测距数据
 void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
 {
   UWB_id = msg.id;
-  // std::cout << UWB_id << std::endl;
   for(auto& node:msg.nodes)
   {
-    // std::cout<< node << std::endl;
-    // get_time[node.id]=ros::Time::now().toSec();
     distance_kf_before = node.dis;
     distance = kf.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
     distance_msg.distances[node.id] =  distance;  
     distance_msg.distances[UWB_id] = 0;       //uwb模块自身与自身的距离值设置为0
-    // distance_all_msg
   }
   for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
   {
@@ -117,18 +136,24 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
     // node.id代表不同uwb广播发出的数据
     for(int i = 0; i < node.data.size(); i++)
     {
-      //接受到的数据
-      rec_data[node.id][i] = node.data[i];
+      //接受到的uwb数据
+      if(i < 32)
+      {
+        rec_data_uwb[node.id][i] = node.data[i]; // 前32个数据为uwb数据
+      }
+      if(i >= 32)
+      {
+        rec_data_broadcast[i] = node.data[i]; // 前32个数据为uwb数据
+      }
     }
     // convertBytesToFloatArray(rec_data[node.id])
-    distance_DATA[node.id] = convertBytesToFloatArray(rec_data[node.id]);  //将数据转换为float数组
+    distance_DATA[node.id] = convertBytesToFloatArray(rec_data_uwb[node.id]);  //将数据转换为float数组
+    Broadcast_DATA = convertBytesToFloatArray(rec_data_broadcast);  //将接收到的广播数据转换会float数组
+    vector2BroadcastMsg(); //将接收到的广播数据使转为msg
     for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
     {
       Vector2Msg(node.id,i,distance_DATA[node.id][i]);
     }
-    // std::cout << distance_DATA[0][0] << std::endl;
-
-    // get_time[node.id]=ros::Time::now().toSec();
   }
 }
 
@@ -149,100 +174,17 @@ int main(int argc, char **argv)
   //创建发布者，发布距离信息，此处发布有8个元素的数组，表示该模块到其他模块的距离，模块号对应的数组元素为0
   ros::Publisher distance_onself_pub = nh.advertise<nlink_distance::DistanceArray_oneself>("/distance_topic", 10); 
   ros::Publisher distance_all_pub = nh.advertise<nlink_distance::DistanceArray_all>("/distance_topic_all", 10); 
+  ros::Publisher Broadcast_pub = nh.advertise<nav_msgs::Odometry>("/communicate_client", 10); 
   distance_msg.distances = {0, 0, 0, 0, 0, 0, 0, 0};
    
   // 循环发布消息
   ros::Rate loop_rate(20); // 设置发布频率为20Hz
   while (ros::ok()) {
-    // vectorToFloatArray(distance_DATA[0], distance_all_msg.uwb0);
-    // vectorToArray(distance_DATA[1], distance_all_msg.uwb1, 8);
-    // vectorToArray(distance_DATA[2], distance_all_msg.uwb2, 8);
-    // vectorToArray(distance_DATA[3], distance_all_msg.uwb3, 8);
-    // vectorToArray(distance_DATA[4], distance_all_msg.uwb4, 8);
-    // vectorToArray(distance_DATA[5], distance_all_msg.uwb5, 8);
-    // vectorToArray(distance_DATA[6], distance_all_msg.uwb6, 8);
-    // vectorToArray(distance_DATA[7], distance_all_msg.uwb7, 8);
 
-    // if(get_time[0]!=0 && get_time[1]!=0 && abs(get_time[0]-get_time[1])<2){
-    //     // outFile0 << target_pos[0][0] <<", "<<target_pos[0][1] <<", " <<target_pos[0][2] << std::endl;
-    //     // outFile1 << target_pos[1][0] <<", "<<target_pos[1][1] <<", " <<target_pos[1][2] << std::endl;
-    //     // auto tmpa=target_pos[1]-target_pos[0];
-    //     // outFile4 << tmpa[0] <<", "<<tmpa[1] <<", " <<tmpa[2] << std::endl;        
-    //     // 填充消息对象的内容
-    //     poseStampedMsg.header.stamp = ros::Time::now();
-    //     poseStampedMsg.header.frame_id = "0"; // 设置坐标系
-    //     auto tmp=(target_pos[0]+target_pos[1])/2;
+      distance_onself_pub.publish(distance_msg); // 发布消息
+      distance_all_pub.publish(distance_all_msg); // 发布消息
+      Broadcast_pub.publish(Broadcast_msg);//发布广播信息
 
-    //     poseStampedMsg.pose.position.x = tmp.x();   // 设置位置
-    //     poseStampedMsg.pose.position.y = tmp.y();
-    //     poseStampedMsg.pose.position.z = tmp.z();
-
-    //     poseStampedMsg.pose.orientation.x = target_pos[0].x(); // 设置方向
-    //     poseStampedMsg.pose.orientation.y = target_pos[0].y();
-    //     poseStampedMsg.pose.orientation.z = target_pos[1].x();
-    //     poseStampedMsg.pose.orientation.w = target_pos[1].y();
-
-    //     pub.publish(poseStampedMsg); // 发布消息
-    //     get_time[0]=0;
-    //     get_time[1]=0;
-        
-    //   }
-
-    //   if(get_time[2]!=0 && get_time[3]!=0 && abs(get_time[2]-get_time[3])<2){
-
-    //     // outFile2 << target_pos[2][0] <<", "<<target_pos[2][1] <<", " <<target_pos[2][2] << std::endl;
-    //     // outFile3 << target_pos[3][0] <<", "<<target_pos[3][1] <<", " <<target_pos[3][2] << std::endl;
-    //     // auto tmpa=target_pos[3]-target_pos[2];
-    //     // outFile5 << tmpa[0] <<", "<<tmpa[1] <<", " <<tmpa[2] << std::endl;  
-
-    //     // 填充消息对象的内容
-    //     poseStampedMsg.header.stamp = ros::Time::now();
-    //     poseStampedMsg.header.frame_id = "1"; // 设置坐标系
-    //     auto tmp=(target_pos[2]+target_pos[3])/2;
-
-    //     poseStampedMsg.pose.position.x = tmp.x();   // 设置位置
-    //     poseStampedMsg.pose.position.y = tmp.y();
-    //     poseStampedMsg.pose.position.z = tmp.z();
-
-    //     poseStampedMsg.pose.orientation.x = target_pos[2].x(); // 设置方向
-    //     poseStampedMsg.pose.orientation.y = target_pos[2].y();
-    //     poseStampedMsg.pose.orientation.z = target_pos[3].x();
-    //     poseStampedMsg.pose.orientation.w = target_pos[3].y();
-
-    //     pub.publish(poseStampedMsg); // 发布消息
-    //     get_time[2]=0;
-    //     get_time[3]=0;
-    //   }
-
-    //   if(get_time[4]!=0 && get_time[5]!=0 && abs(get_time[4]-get_time[5])<2){
-    //     // outFile0 << target_pos[0][0] <<", "<<target_pos[0][1] <<", " <<target_pos[0][2] << std::endl;
-    //     // outFile1 << target_pos[1][0] <<", "<<target_pos[1][1] <<", " <<target_pos[1][2] << std::endl;
-    //     // auto tmpa=target_pos[1]-target_pos[0];
-    //     // outFile4 << tmpa[0] <<", "<<tmpa[1] <<", " <<tmpa[2] << std::endl;        
-        
-    //     // 填充消息对象的内容
-
-    //     poseStampedMsg.header.stamp = ros::Time::now();
-    //     poseStampedMsg.header.frame_id = "2"; // 设置坐标系
-    //     auto tmp=(target_pos[4]+target_pos[5])/2;
-
-
-    //     poseStampedMsg.pose.position.x = tmp.x();   // 设置位置
-    //     poseStampedMsg.pose.position.y = tmp.y();
-    //     poseStampedMsg.pose.position.z = tmp.z();
-
-    //     poseStampedMsg.pose.orientation.x = target_pos[4].x(); // 设置方向
-    //     poseStampedMsg.pose.orientation.y = target_pos[4].y();
-    //     poseStampedMsg.pose.orientation.z = target_pos[5].x();
-    //     poseStampedMsg.pose.orientation.w = target_pos[5].y();
-        // outFile0 << distance_kf_before << std::endl;
-        // outFile1 << distance << std::endl;
-        distance_onself_pub.publish(distance_msg); // 发布消息
-        distance_all_pub.publish(distance_all_msg); // 发布消息
-    //     get_time[4]=0;
-    //     get_time[5]=0;
-        
-    //   }
 
       ros::spinOnce();             // 处理回调函数
       loop_rate.sleep();           // 休眠以维持发布频率

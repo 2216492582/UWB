@@ -8,10 +8,11 @@
 #include <iostream>
 #include <vector>
 #include <nlink_distance/DistanceArray_oneself.h>
+#include <nav_msgs/Odometry.h>
 
 // nlink_distance::DistanceArray distance_msg;  //存储distance的msg
-float distance_array[8];
-
+float distance_array[8];  //uwb距离数组
+float Broadcast_data[11];  //广播转发数据使用数组
 
 void printHexData(const std::string &data) {
   if (!data.empty()) {
@@ -46,7 +47,8 @@ std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData
 }
 
 
-std::vector<uint8_t> byteData;//用于存储float转化为byte的数据
+std::vector<uint8_t> byteData;//用于存储float转化为byte的数据 uwb数组
+std::vector<uint8_t> Forward_byteData;//用于存储float转化为byte的数据 广播数据数组
 //DistanceMsg的回调函数，用于接受距离数据，并将其转化为字节数据存储，等待后续发送
 void DistanceMsgCallback(const nlink_distance::DistanceArray_oneself &msg)
 {
@@ -60,6 +62,23 @@ void DistanceMsgCallback(const nlink_distance::DistanceArray_oneself &msg)
 }
 
 
+//communicate_server的回调函数，用于接受广播数据，并将其转化为字节数据存储，等待后续发送
+void communicate_MsgCallback(const nav_msgs::Odometry &msg)
+{
+  Broadcast_data[0] = msg.pose.pose.position.x; 
+  Broadcast_data[1] = msg.pose.pose.position.y; 
+  Broadcast_data[2] = msg.pose.pose.position.z;
+  Broadcast_data[3] = msg.pose.pose.orientation.x; 
+  Broadcast_data[4] = msg.pose.pose.orientation.y; 
+  Broadcast_data[5] = msg.pose.pose.orientation.z;
+  Broadcast_data[6] = msg.pose.pose.orientation.w; 
+  Broadcast_data[7] = msg.pose.covariance[0];
+  Broadcast_data[8] = msg.pose.covariance[1];
+  Broadcast_data[9] = msg.twist.covariance[0];  
+  Broadcast_data[10] = msg.twist.covariance[1]; 
+}
+
+
 int main(int argc, char **argv) {
   ros::init(argc, argv, "linktrack_parser");
   ros::NodeHandle nh;
@@ -68,14 +87,18 @@ int main(int argc, char **argv) {
   NProtocolExtracter protocol_extraction;
   linktrack::Init init(&protocol_extraction, &serial);
   ros::Subscriber data_sub1 = nh.subscribe("/distance_topic", 1000, DistanceMsgCallback);   //订阅距离话题
+  ros::Subscriber data_sub2 = nh.subscribe("/communicate_server", 1000, DistanceMsgCallback);   //订阅距离话题
   ros::Rate loop_rate(1000);
+
   while (ros::ok()) {
-    
+    std::cout << byteData.size() << std::endl;
     auto available_bytes = serial.available();
     std::string str_received;
     if (available_bytes) {
       serial.read(str_received, available_bytes);
       serial.write(byteData); //串口写函数
+      Forward_byteData = convertFloatArrayToBytes(Broadcast_data,11);
+      serial.write(Forward_byteData); //串口写函数
       // printHexData(str_received);
       protocol_extraction.AddNewData(str_received);
     }
