@@ -46,10 +46,17 @@ std::vector<std::vector<uint8_t> > rec_data_uwb(8,std::vector<uint8_t>(DATA_leng
 std::vector<uint8_t > rec_data_broadcast(44);  //接收到的广播数据
 
 std::vector<std::vector<float> > distance_DATA(8,std::vector<float>(8,0));
-std::vector<float> Broadcast_DATA(11);
+std::vector<float> Broadcast_DATA(15);
 
-KalmanFilter kf(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
-
+KalmanFilter kf0(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf1(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf2(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf3(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf4(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf5(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf6(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+KalmanFilter kf7(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
+// KalmanFilter kf5(0.1, 15, 1, 0.0);  //初始化一个卡尔曼滤波器
 //将字节数据转换回float数组
 // Function to convert byte array back to float array
 std::vector<float> convertBytesToFloatArray(const std::vector<uint8_t>& byteData) {
@@ -116,7 +123,28 @@ void nodeframe2Callback(const nlink_parser::LinktrackNodeframe2 &msg)
   for(auto& node:msg.nodes)
   {
     distance_kf_before = node.dis;
-    distance = kf.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+    switch (node.id)
+    {
+    case 0:distance = kf0.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 1:distance = kf1.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 2:distance = kf2.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 3:distance = kf3.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 4:distance = kf4.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 5:distance = kf5.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 6:distance = kf6.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    case 7:distance = kf7.filter(distance_kf_before); //测距值抖动较大，使用卡尔曼滤波器
+      break;
+    default:
+      break;
+    }
+    
     distance_msg.distances[node.id] =  distance;  
     distance_msg.distances[UWB_id] = 0;       //uwb模块自身与自身的距离值设置为0
   }
@@ -148,7 +176,7 @@ void nodeframe0Callback(const nlink_parser::LinktrackNodeframe0 &msg)
     }
     // convertBytesToFloatArray(rec_data[node.id])
     distance_DATA[node.id] = convertBytesToFloatArray(rec_data_uwb[node.id]);  //将数据转换为float数组
-    Broadcast_DATA = convertBytesToFloatArray(rec_data_broadcast);  //将接收到的广播数据转换会float数组
+    Broadcast_DATA = convertBytesToFloatArray(rec_data_broadcast);  //将接收到的广播数据转换回float数组
     vector2BroadcastMsg(); //将接收到的广播数据使转为msg
     for (int i = 0; i < 8; ++i)   //将本模块与其他模块的距离数组元素赋值给distance_DATA
     {

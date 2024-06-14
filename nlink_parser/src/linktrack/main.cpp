@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
   ros::Rate loop_rate(1000);
 
   while (ros::ok()) {
-    std::cout << byteData.size() << std::endl;
+    // std::cout << byteData.size() << std::endl;
     auto available_bytes = serial.available();
     std::string str_received;
     if (available_bytes) {
