@@ -12,7 +12,7 @@
 
 // nlink_distance::DistanceArray distance_msg;  //存储distance的msg
 float distance_array[8];  //uwb距离数组
-float Broadcast_data[11];  //广播转发数据使用数组
+float Broadcast_data[12];  //广播转发数据使用数组
 
 void printHexData(const std::string &data) {
   if (!data.empty()) {
@@ -76,6 +76,8 @@ void communicate_MsgCallback(const nav_msgs::Odometry &msg)
   Broadcast_data[8] = msg.pose.covariance[1];
   Broadcast_data[9] = msg.twist.covariance[0];  
   Broadcast_data[10] = msg.twist.covariance[1]; 
+  Broadcast_data[11] = msg.twist.covariance[2]; 
+  Forward_byteData = convertFloatArrayToBytes(Broadcast_data,12);
 }
 
 
@@ -87,7 +89,7 @@ int main(int argc, char **argv) {
   NProtocolExtracter protocol_extraction;
   linktrack::Init init(&protocol_extraction, &serial);
   ros::Subscriber data_sub1 = nh.subscribe("/distance_topic", 1000, DistanceMsgCallback);   //订阅距离话题
-  ros::Subscriber data_sub2 = nh.subscribe("/communicate_server", 1000, DistanceMsgCallback);   //订阅距离话题
+  ros::Subscriber data_sub2 = nh.subscribe("/communicate_server", 1000, communicate_MsgCallback);   //订阅距离话题
   ros::Rate loop_rate(1000);
 
   while (ros::ok()) {
@@ -97,9 +99,7 @@ int main(int argc, char **argv) {
     if (available_bytes) {
       serial.read(str_received, available_bytes);
       serial.write(byteData); //串口写函数
-      Forward_byteData = convertFloatArrayToBytes(Broadcast_data,11);
       serial.write(Forward_byteData); //串口写函数
-      // printHexData(str_received);
       protocol_extraction.AddNewData(str_received);
     }
     ros::spinOnce();
